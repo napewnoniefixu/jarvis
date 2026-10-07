@@ -218,3 +218,27 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ==========================================
+# JARVIS - Własne reguły projektu
+# ==========================================
+
+# Zewnętrzny kod źródłowy silnika C++
+whisper.cpp/
+
+# Wagi modeli AI (duże pliki binarne)
+models/
+*.bin
+*.onnx
+
+# Nagrania i pliki tymczasowe audio
+*.wav
+*.mp3
+
+# Artefakty kompilatora C++ i CMake (Windows/MinGW)
+*.exe
+*.obj
+*.o
+*.dll
+CMakeFiles/
+CMakeCache.txt
