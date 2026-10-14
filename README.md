@@ -1,6 +1,6 @@
 # JARVIS — Local Intelligent Voice Assistant
 
-A private, real-time voice assistant running locally on Windows 11. The project combines the flexibility of Python with a high-performance C++ speech transcription engine (`whisper.cpp`), minimizing system resource overhead and eliminating any dependency on external cloud services.
+A private, real-time voice assistant running locally on Windows 11. The project combines the flexibility of Python with high-performance native engines: speech transcription via `whisper.cpp` (C++) and neural speech synthesis via `Piper TTS`, minimizing system resource overhead and eliminating any dependency on external cloud services.
 
 ---
 
@@ -8,6 +8,7 @@ A private, real-time voice assistant running locally on Windows 11. The project 
 
 - **Audio Capture & VAD (Voice Activity Detection):** Continuous audio streaming (16 kHz, 16-bit PCM mono) with dynamic speech/silence detection powered by vectorized RMS computation in NumPy.
 - **Speech Transcription (ASR):** Fast, local inference using a compiled `whisper.cpp` binary (GGML model format).
+- **Speech Synthesis (TTS):** Completely offline, low-latency neural text-to-speech using standalone Piper TTS (`piper.exe`) with the Polish `darkman-medium` voice model, featuring configurable speech rate and software-level volume attenuation.
 - **Wake Word Detection (In Progress):** Lightweight keyword spotting (*"Jarvis"*) running continuously in the background via the ONNX runtime.
 - **Orchestration & Tool Execution (Planned):** Local LLM integration to parse intent and execute operating system tasks and integrations.
 
@@ -18,7 +19,7 @@ A private, real-time voice assistant running locally on Windows 11. The project 
 - **Operating System:** Windows 11
 - **Python:** 3.10+
 - **C++ Compiler:** MinGW-w64 (GCC/G++) or Visual Studio Build Tools (MSVC)
-- **Tools:** CMake, Git, `curl`
+- **Tools:** CMake, Git, `curl`, PowerShell
 
 ---
 
@@ -34,10 +35,8 @@ cd <REPOSITORY_DIRECTORY>
 ```powershell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install sounddevice numpy
 ```
-
-*(If you do not have `requirements.txt` yet, install the core dependencies manually: `pip install sounddevice numpy`)*
 
 ### 3. Build the C++ Transcription Engine (`whisper.cpp`)
 The core speech engine is built locally and is excluded from version control:
@@ -54,27 +53,47 @@ cmake --build build --config Release
 cd ..
 ```
 
-### 4. Download Whisper Model Weights
-Download the quantized `base` model (~140 MB) into a dedicated `models/` folder:
+### 4. Setup Piper TTS Engine
+Download and extract the standalone Windows binary release:
+
+```powershell
+curl.exe -L "[https://github.com/rhasspy/piper/releases/latest/download/piper_windows_amd64.zip](https://github.com/rhasspy/piper/releases/latest/download/piper_windows_amd64.zip)" -o "piper_windows.zip"
+Expand-Archive -Path "piper_windows.zip" -DestinationPath "."
+Remove-Item "piper_windows.zip"
+```
+
+### 5. Download Model Weights
+All model weights are placed in a central `models/` directory (excluded from git):
 
 ```powershell
 if (!(Test-Path -Path "models")) { New-Item -ItemType Directory -Path "models" }
+
+# Whisper ASR model (~140 MB)
 curl.exe -L "[https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin](https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin)" -o "models/ggml-base.bin"
+
+# Piper TTS Polish Darkman voice model (~60 MB + config)
+curl.exe -L "[https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx](https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx)" -o "models/pl_PL-darkman-medium.onnx"
+curl.exe -L "[https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx.json](https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx.json)" -o "models/pl_PL-darkman-medium.onnx.json"
 ```
 
 ---
 
 ## ▶️ Running the Project
 
-Run the recording and silence detection module:
-
+### Test Text-to-Speech (TTS)
+Verify the Piper neural voice engine in isolation:
 ```powershell
-python test_silence.py
+python tts.py
 ```
 
-1. Speak into the microphone — the algorithm triggers recording automatically once audio energy exceeds the RMS threshold.
-2. Stop speaking and remain quiet for ~1.5 seconds.
-3. The script automatically finalizes the audio buffer and plays back the captured input.
+### Run the Core Pipeline
+Run speech recording, silence detection, transcription, and synthesized response:
+```powershell
+python main.py
+```
+1. Speak into your microphone after the prompt appears.
+2. Stop speaking — the silence detector will automatically finalize recording after ~800 ms of quiet.
+3. The audio is transcribed locally using `whisper.cpp`, and JARVIS responds using the neural TTS voice.
 
 ---
 
@@ -83,7 +102,8 @@ python test_silence.py
 - [x] Continuous audio streaming and vectorized RMS calculation in NumPy
 - [x] Energy-based silence detection mechanism to auto-stop recording
 - [x] WAV buffer conversion and `whisper-cli.exe` integration via `subprocess`
+- [x] Local Text-to-Speech (TTS) synthesis via Piper TTS (`darkman` voice model)
+- [ ] Modular code refactoring (`audio.py`, `transcriber.py`, `tts.py`, `main.py`)
 - [ ] Background wake word detection (*Wake Word: Jarvis*)
 - [ ] Local LLM integration (e.g., Llama via Ollama / `llama.cpp`)
 - [ ] OS-level action execution (system commands, application launcher, media control)
-- [ ] Local Text-to-Speech (TTS) response synthesis
