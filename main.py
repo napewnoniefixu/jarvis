@@ -5,7 +5,7 @@ import wave
 import subprocess
 
 THRESHOLD = 0.003
-SILENCE_LIMIT_FRAMES = 15
+SILENCE_LIMIT_FRAMES = 8
 
 SAMPLE_RATE = 16000
 CHANNELS = 1
@@ -59,7 +59,9 @@ def transcribe(filename = "temp_command.wav"):
     "-m", "whisper.cpp/models/ggml-base.bin",
     "-f", filename,
     "-l", "pl",
-    "--no-timestamps"
+    "--no-timestamps",
+    "-t", "8",
+    "--suppress-nst"
     ]
 
     result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
