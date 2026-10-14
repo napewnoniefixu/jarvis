@@ -1,5 +1,8 @@
+import cmd
 import numpy as np
 import sounddevice as sd
+import wave
+import subprocess
 
 THRESHOLD = 0.003
 SILENCE_LIMIT_FRAMES = 15
@@ -41,9 +44,33 @@ def record_command():
     full_audio = np.concatenate(frames, axis=0)
     return full_audio
 
+def save_wav(audio_data, filename = "temp_command.wav"):
+    audio_data_int16 = (audio_data * 32767).astype(np.int16)
 
-print("Listening...")
-audio_data = record_command()
-print("Done listening.")
-sd.play(audio_data, SAMPLE_RATE)
-sd.wait()
+    with wave.open(filename, 'w') as wav_file:
+        wav_file.setnchannels(CHANNELS)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(SAMPLE_RATE)
+        wav_file.writeframes(audio_data_int16.tobytes())
+
+def transcribe(filename = "temp_command.wav"):
+    cmd = [
+    "whisper.cpp/build/bin/whisper-cli.exe",
+    "-m", "whisper.cpp/models/ggml-base.bin",
+    "-f", filename,
+    "-l", "pl",
+    "--no-timestamps"
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+
+    if result.returncode == 0 and result.stdout:
+        return result.stdout.strip().lower()
+
+    return None
+
+print("Mów...")
+audio = record_command()
+save_wav(audio)
+tekst = transcribe()
+print(f"\n[JARVIS usłyszał]: {tekst}")
