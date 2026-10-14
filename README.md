@@ -82,8 +82,8 @@ python test_silence.py
 
 - [x] Continuous audio streaming and vectorized RMS calculation in NumPy
 - [x] Energy-based silence detection mechanism to auto-stop recording
-- [ ] WAV buffer conversion and `whisper-cli.exe` integration via `subprocess`
-- [ ] Background wake word detection (*Wake Word: Hey Jarvis*)
+- [x] WAV buffer conversion and `whisper-cli.exe` integration via `subprocess`
+- [ ] Background wake word detection (*Wake Word: Jarvis*)
 - [ ] Local LLM integration (e.g., Llama via Ollama / `llama.cpp`)
 - [ ] OS-level action execution (system commands, application launcher, media control)
 - [ ] Local Text-to-Speech (TTS) response synthesis
