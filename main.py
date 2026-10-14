@@ -1,78 +1,18 @@
-import cmd
-import numpy as np
-import sounddevice as sd
-import wave
-import subprocess
-
-THRESHOLD = 0.003
-SILENCE_LIMIT_FRAMES = 8
-
-SAMPLE_RATE = 16000
-CHANNELS = 1
-DTYPE = 'float32'
-BLOCKSIZE = 1600
-
-def calculate_RMS(audio_chunk):
-    return float(np.sqrt(np.mean(audio_chunk**2)))
+from tts import init_tts, speak
+from audio import record_command, save_wav
+from transcriber import transcribe
 
 
-def record_command():
-    frames = []
-    has_spoken = False
-    silence_frames = 0
-
-    with sd.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE, blocksize=BLOCKSIZE) as stream:
-        while True:
-            data, _ = stream.read(BLOCKSIZE)
-            frames.append(data.copy())
-
-            current_rms = calculate_RMS(data)
-
-            if current_rms > THRESHOLD:
-                has_spoken = True
-                silence_frames = 0
-            else:
-                if has_spoken:
-                    silence_frames += 1
-                    if silence_frames > SILENCE_LIMIT_FRAMES:
-                        break
-                else:
-                    silence_frames += 1
-                    if silence_frames >= 50:
-                        break
+def main():
+    tts = init_tts()
+    speak(tts, "Jestem gotowy.")
     
-    full_audio = np.concatenate(frames, axis=0)
-    return full_audio
+    audio = record_command()
+    save_wav(audio)
+    text = transcribe()
+    
+    if text:
+        speak(tts, f"Usłyszałem: {text}")
 
-def save_wav(audio_data, filename = "temp_command.wav"):
-    audio_data_int16 = (audio_data * 32767).astype(np.int16)
-
-    with wave.open(filename, 'w') as wav_file:
-        wav_file.setnchannels(CHANNELS)
-        wav_file.setsampwidth(2)
-        wav_file.setframerate(SAMPLE_RATE)
-        wav_file.writeframes(audio_data_int16.tobytes())
-
-def transcribe(filename = "temp_command.wav"):
-    cmd = [
-    "whisper.cpp/build/bin/whisper-cli.exe",
-    "-m", "whisper.cpp/models/ggml-base.bin",
-    "-f", filename,
-    "-l", "pl",
-    "--no-timestamps",
-    "-t", "8",
-    "--suppress-nst"
-    ]
-
-    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
-
-    if result.returncode == 0 and result.stdout:
-        return result.stdout.strip().lower()
-
-    return None
-
-print("Mów...")
-audio = record_command()
-save_wav(audio)
-tekst = transcribe()
-print(f"\n[JARVIS usłyszał]: {tekst}")
+if __name__ == "__main__":
+    main()

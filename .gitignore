@@ -225,6 +225,7 @@ __marimo__/
 
 # Zewnętrzny kod źródłowy silnika C++
 whisper.cpp/
+piper/
 
 # Wagi modeli AI (duże pliki binarne)
 models/
