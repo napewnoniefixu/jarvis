@@ -7,10 +7,10 @@ import numpy as np
 BASE_DIR = Path(__file__).resolve().parent
 
 PIPER_EXE = BASE_DIR / "piper" / "piper.exe"
-MODEL_PATH = BASE_DIR / "models" / "pl_PL-darkman-medium.onnx"
+MODEL_PATH = BASE_DIR / "models" / "pl_PL-bass-high.onnx"
 OUTPUT_WAV = BASE_DIR / "temp_response.wav"
 
-def play_audio(wav_path, volume = 0.4):
+def play_audio(wav_path, volume = 0.2):
     with wave.open(str(wav_path), "rb") as wf:
         samplerate = wf.getframerate()  
         frames = wf.readframes(wf.getnframes())
@@ -29,7 +29,7 @@ def speak(text):
     "-f",
     str(OUTPUT_WAV),
     "--length-scale",
-    "0.75", 
+    "0.85", 
 ]
     subprocess.run(
         cmd, input=text, text=True, encoding="utf-8", capture_output=True
@@ -38,4 +38,4 @@ def speak(text):
 
 
 if __name__ == "__main__":
-    speak("System Dżarwis jest gotowy do użycia")
+    speak("Jestem gotowy do działania!")
