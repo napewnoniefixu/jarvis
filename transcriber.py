@@ -3,7 +3,7 @@ import subprocess
 def transcribe(filename = "temp_command.wav"):
     cmd = [
     "whisper.cpp/build/bin/whisper-cli.exe",
-    "-m", "whisper.cpp/models/ggml-base.bin",
+    "-m", "models/ggml-base.bin",
     "-f", filename,
     "-l", "pl",
     "--no-timestamps",

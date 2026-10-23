@@ -4,7 +4,7 @@ from transcriber import transcribe
 
 
 def main():
-    speak("Gotów!")
+    speak("Jestem gotów!")
     
     print("Słucham...")
     audio = record_command()
@@ -18,6 +18,19 @@ def main():
         speak(f"Usłyszałem: {text}")
     else:
         speak("Nie dosłyszałem, powtórz proszę.")
+
+        print("Słucham...")
+        audio = record_command()
+        save_wav(audio)
+
+        print("Przetwarzam...")
+        text = transcribe()
+        
+        if text:
+            print(f"Usłyszałem: {text}")
+            speak(f"Usłyszałem: {text}")
+        else:
+            speak("Nie dosłyszałem nadal, odstawiam to.")
         
 if __name__ == "__main__":
     main()
