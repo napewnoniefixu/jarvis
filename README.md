@@ -14,24 +14,24 @@ A private, real-time voice assistant running 100% locally on Windows 11. JARVIS 
 
 ```mermaid
 flowchart TD
-    Mic([🎤 Microphone]) -->|16 kHz Mono PCM| Audio[audio.py: RMS Voice Activity Detection]
-    Audio -->|Speech Finalized (~800ms silence)| WAV[(temp_command.wav)]
-    WAV --> Transcriber[transcriber.py: whisper.cpp C++ CLI]
-    Transcriber -->|Transcribed Polish Text| Actions[actions.py: Ollama Llama 3.1]
+    Mic["🎤 Microphone"] -->|"16 kHz Mono PCM"| Audio["audio.py (RMS Voice Activity Detection)"]
+    Audio -->|"Speech Finalized"| WAV["temp_command.wav"]
+    WAV --> Transcriber["transcriber.py (whisper.cpp C++ CLI)"]
+    Transcriber -->|"Transcribed Polish Text"| Actions["actions.py (Ollama Llama 3.1)"]
     
-    Actions -->|Function Call| Registry{registry.py: Tool Router}
-    Registry -->|open_notepad| ToolNotepad[tools.py: notepad.exe]
-    Registry -->|get_time| ToolTime[tools.py: system clock]
-    Registry -->|zwykla_odpowiedz| ToolChat[tools.py: conversational response]
+    Actions -->|"Function Call"| Registry{"registry.py (Tool Router)"}
+    Registry -->|"open_notepad"| ToolNotepad["tools.py (notepad.exe)"]
+    Registry -->|"get_time"| ToolTime["tools.py (system clock)"]
+    Registry -->|"zwykla_odpowiedz"| ToolChat["tools.py (conversational response)"]
     
-    Actions -->|Direct Text / Tool Result| TTS[tts.py: Piper TTS Engine]
-    ToolNotepad -->|Confirmation| TTS
-    ToolTime -->|Time String| TTS
-    ToolChat -->|Spoken Reply| TTS
+    Actions -->|"Direct Text or Tool Result"| TTS["tts.py (Piper TTS Engine)"]
+    ToolNotepad -->|"Confirmation"| TTS
+    ToolTime -->|"Time String"| TTS
+    ToolChat -->|"Spoken Reply"| TTS
     
-    TTS -->|--output_raw stdout pipe| Buffer[In-Memory NumPy Float32 Buffer]
-    Buffer -->|Software Volume Scaling| Playback[sounddevice.play @ 22.05 kHz]
-    Playback --> Speaker([🔊 Speakers])
+    TTS -->|"Raw PCM stdout stream"| Buffer["In-Memory NumPy Float32 Buffer"]
+    Buffer -->|"Software Volume Scaling"| Playback["sounddevice.play (22.05 kHz)"]
+    Playback --> Speaker["🔊 Speakers"]
 ```
 
 - **Audio Capture & VAD (Voice Activity Detection):** Continuous 16 kHz 16-bit mono audio streaming via `sounddevice`. Employs vectorized Root Mean Square (RMS) energy analysis with dynamic thresholding to detect speech onset and automatically cut off recording after ~800 ms of trailing silence (or a ~5.0 s timeout if no speech is detected).
