@@ -4,14 +4,20 @@ from transcriber import transcribe
 
 
 def main():
-    speak("Jestem gotowy.")
+    speak("Gotów!")
     
+    print("Słucham...")
     audio = record_command()
     save_wav(audio)
+
+    print("Przetwarzam...")
     text = transcribe()
     
     if text:
-        speak(tts, f"Usłyszałem: {text}")
-
+        print(f"Usłyszałem: {text}")
+        speak(f"Usłyszałem: {text}")
+    else:
+        speak("Nie dosłyszałem, powtórz proszę.")
+        
 if __name__ == "__main__":
     main()
