@@ -13,8 +13,8 @@ import tools  # Ensures all @tool decorators execute and register on startup
 # --- Ollama Engine Configuration ---
 MODEL_NAME: str = 'llama3.1'
 SYSTEM_PROMPT: str = (
-    'Jesteś krótkim i zwięzłym asystentem głosowym o imieniu Jarvis (wymawiane "Dżarwis"). '
-    'Odpowiadaj maksymalnie w jednym lub dwóch zdaniach.'
+    'Jesteś inteligentnym, wyluzowanym asystentem głosowym o imieniu Dżarwis. '
+    'Prowadź naturalną konwersację.'
 )
 FALLBACK_RESPONSE: str = "Wybacz, nie wiem co powiedzieć."
 
@@ -26,6 +26,7 @@ def execute_command(user_text: str) -> str:
     If the model determines that a tool should be called:
     - Extracts the function name from `tool_calls`.
     - Looks up and executes the callable in `AVAILABLE_TOOLS`.
+    - Forwards any extracted arguments (`**arguments`) into the callable.
     - Returns the tool's execution result.
     If no tool call is requested, returns the model's direct conversational reply.
 
@@ -48,16 +49,20 @@ def execute_command(user_text: str) -> str:
     
     # Check if the LLM decided to invoke an external tool
     if message.get('tool_calls'):
-        for tool_call in message['tool_calls']:
-            func_name = tool_call['function']['name']
-            
-            if func_name in AVAILABLE_TOOLS:
-                print(f"[LLM DECYZJA]: Wywołuję funkcję -> {func_name}")
-                return str(AVAILABLE_TOOLS[func_name]())
-                
+        tool_call = message['tool_calls'][0]
+        func_name = tool_call['function']['name']
+        
+        arguments = tool_call['function'].get('arguments', {})
+        
+        if func_name in AVAILABLE_TOOLS:
+            print(f"\n[JARVIS LOGIC]: Uruchamiam narzędzie -> {func_name}")
+            print(f"[JARVIS LOGIC]: Przekazane argumenty -> {arguments}")
+
+            return AVAILABLE_TOOLS[func_name](**arguments)
+                            
     # Fallback to direct conversational response if no tool call was made
     content = message.get('content', '')
     if content:
-        return content
+        return content.strip()
          
     return FALLBACK_RESPONSE

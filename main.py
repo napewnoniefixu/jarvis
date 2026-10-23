@@ -17,20 +17,19 @@ def main() -> None:
     """Execute the core voice interaction loop.
 
     Workflow:
-    1. Plays an initial greeting indicating readiness.
+    1. Plays an initial greeting indicating readiness ("Witam szefie, co robimy?").
     2. Listens for user voice input via the microphone and records the command.
     3. Saves captured audio to a temporary WAV file.
-    4. Transcribes the audio locally using whisper.cpp.
+    4. Transcribes the audio locally using whisper.cpp and prints recognized text.
     5. If transcription is successful:
-       - Confirms what was heard via TTS.
        - Passes the text to the local LLM (`actions.execute_command`) to run
          system tools or generate conversational responses.
        - Vocalizes the LLM / tool response via TTS.
-    6. If no speech is recognized, prompts the user to repeat and performs
-       a secondary listening and transcription attempt before standing down.
+    6. If no speech is recognized, prompts the user to repeat ("Nie dosłyszałem, powtórz proszę.")
+       and performs a secondary listening and transcription attempt before standing down.
     """
     # Notify user that the assistant is ready
-    speak("Jestem gotów!")
+    speak("Witam szefie, co robimy?")
     
     # --- Primary Listening Pass ---
     print("Słucham...")
@@ -42,7 +41,6 @@ def main() -> None:
     
     if text:
         print(f"Usłyszałem: {text}")
-        speak(f"Usłyszałem: {text}")
         response = execute_command(text)
         speak(response)
     else:
@@ -58,7 +56,6 @@ def main() -> None:
         
         if text:
             print(f"Usłyszałem: {text}")
-            speak(f"Usłyszałem: {text}")
             response = execute_command(text)
             speak(response)
         else:
