@@ -7,10 +7,27 @@ A private, real-time voice assistant running locally on Windows 11. The project 
 ## 🚀 Architecture & Features
 
 - **Audio Capture & VAD (Voice Activity Detection):** Continuous audio streaming (16 kHz, 16-bit PCM mono) with dynamic speech/silence detection powered by vectorized RMS computation in NumPy.
-- **Speech Transcription (ASR):** Fast, local inference using a compiled `whisper.cpp` binary (GGML model format).
-- **Speech Synthesis (TTS):** Completely offline, low-latency neural text-to-speech using standalone Piper TTS (`piper.exe`) with the Polish `darkman-medium` voice model, featuring configurable speech rate and software-level volume attenuation.
+- **Speech Transcription (ASR):** Fast, local inference using a compiled `whisper.cpp` binary (`whisper-cli.exe`) operating on GGML base model format.
+- **Speech Synthesis (TTS):** Completely offline, low-latency neural text-to-speech using standalone Piper TTS (`piper.exe`) with the Polish `bass-high` voice model (with support for `darkman-medium`), featuring configurable speech rate (`--length-scale`) and software-level volume attenuation.
+- **Conversational Flow & Retry Mechanism:** Interactive voice loop with readiness indicator and automated fallback retry if speech is not detected or unintelligible.
+- **Type Annotations & Documentation:** Fully typed with PEP 484 type hints and documented with Google-style docstrings across all modules.
 - **Wake Word Detection (In Progress):** Lightweight keyword spotting (*"Jarvis"*) running continuously in the background via the ONNX runtime.
 - **Orchestration & Tool Execution (Planned):** Local LLM integration to parse intent and execute operating system tasks and integrations.
+
+---
+
+## 📁 Project Structure
+
+```text
+jarvis/
+├── audio.py              # Microphone streaming, vectorized RMS energy calculation, and VAD
+├── transcriber.py        # Subprocess wrapper for whisper.cpp (whisper-cli.exe)
+├── tts.py                # Piper neural TTS speech synthesis and synchronous playback
+├── main.py               # Core application entry point and conversational orchestration loop
+├── models/               # Model weights (Whisper GGML & Piper ONNX) [git-ignored]
+├── piper/                # Standalone Piper Windows binary and runtime dependencies [git-ignored]
+└── whisper.cpp/          # Locally compiled C++ speech recognition engine [git-ignored]
+```
 
 ---
 
@@ -27,8 +44,8 @@ A private, real-time voice assistant running locally on Windows 11. The project 
 
 ### 1. Clone the repository
 ```powershell
-git clone <YOUR_REPOSITORY_URL>
-cd <REPOSITORY_DIRECTORY>
+git clone https://github.com/napewnoniefixu/jarvis.git
+cd jarvis
 ```
 
 ### 2. Python Virtual Environment
@@ -43,7 +60,7 @@ The core speech engine is built locally and is excluded from version control:
 
 ```powershell
 # Clone the whisper.cpp repository
-git clone [https://github.com/ggerganov/whisper.cpp.git](https://github.com/ggerganov/whisper.cpp.git)
+git clone https://github.com/ggerganov/whisper.cpp.git
 cd whisper.cpp
 
 # Configure and compile (using MinGW)
@@ -54,10 +71,10 @@ cd ..
 ```
 
 ### 4. Setup Piper TTS Engine
-Download and extract the standalone Windows binary release:
+Download and extract the standalone Windows binary release into the `piper/` folder:
 
 ```powershell
-curl.exe -L "[https://github.com/rhasspy/piper/releases/latest/download/piper_windows_amd64.zip](https://github.com/rhasspy/piper/releases/latest/download/piper_windows_amd64.zip)" -o "piper_windows.zip"
+curl.exe -L "https://github.com/rhasspy/piper/releases/latest/download/piper_windows_amd64.zip" -o "piper_windows.zip"
 Expand-Archive -Path "piper_windows.zip" -DestinationPath "."
 Remove-Item "piper_windows.zip"
 ```
@@ -69,11 +86,15 @@ All model weights are placed in a central `models/` directory (excluded from git
 if (!(Test-Path -Path "models")) { New-Item -ItemType Directory -Path "models" }
 
 # Whisper ASR model (~140 MB)
-curl.exe -L "[https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin](https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin)" -o "models/ggml-base.bin"
+curl.exe -L "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin" -o "models/ggml-base.bin"
 
-# Piper TTS Polish Darkman voice model (~60 MB + config)
-curl.exe -L "[https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx](https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx)" -o "models/pl_PL-darkman-medium.onnx"
-curl.exe -L "[https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx.json](https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx.json)" -o "models/pl_PL-darkman-medium.onnx.json"
+# Piper TTS Polish Bass voice model (Default, ~114 MB + config)
+curl.exe -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/bass/high/pl_PL-bass-high.onnx" -o "models/pl_PL-bass-high.onnx"
+curl.exe -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/bass/high/pl_PL-bass-high.onnx.json" -o "models/pl_PL-bass-high.onnx.json"
+
+# (Optional) Piper TTS Polish Darkman voice model (~63 MB + config)
+curl.exe -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx" -o "models/pl_PL-darkman-medium.onnx"
+curl.exe -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx.json" -o "models/pl_PL-darkman-medium.onnx.json"
 ```
 
 ---
@@ -91,9 +112,11 @@ Run speech recording, silence detection, transcription, and synthesized response
 ```powershell
 python main.py
 ```
-1. Speak into your microphone after the prompt appears.
-2. Stop speaking — the silence detector will automatically finalize recording after ~800 ms of quiet.
-3. The audio is transcribed locally using `whisper.cpp`, and JARVIS responds using the neural TTS voice.
+1. JARVIS announces readiness (*"Jestem gotów!"*).
+2. Speak into your microphone after the `Słucham...` prompt appears.
+3. Stop speaking — the Voice Activity Detector (VAD) automatically finalizes recording after ~800 ms of trailing silence.
+4. The audio is transcribed locally using `whisper.cpp`, and JARVIS responds using the neural TTS voice.
+5. If no speech was detected, JARVIS politely prompts for a retry (*"Nie dosłyszałem, powtórz proszę."*) before timing out.
 
 ---
 
@@ -102,8 +125,10 @@ python main.py
 - [x] Continuous audio streaming and vectorized RMS calculation in NumPy
 - [x] Energy-based silence detection mechanism to auto-stop recording
 - [x] WAV buffer conversion and `whisper-cli.exe` integration via `subprocess`
-- [x] Local Text-to-Speech (TTS) synthesis via Piper TTS (`darkman` voice model)
-- [ ] Modular code refactoring (`audio.py`, `transcriber.py`, `tts.py`, `main.py`)
+- [x] Local Text-to-Speech (TTS) synthesis via Piper TTS (`bass-high` & `darkman-medium`)
+- [x] Modular architecture refactoring (`audio.py`, `transcriber.py`, `tts.py`, `main.py`)
+- [x] Comprehensive code documentation and PEP 484 type annotations
+- [x] Conversational retry/fallback logic for missing speech input
 - [ ] Background wake word detection (*Wake Word: Jarvis*)
 - [ ] Local LLM integration (e.g., Llama via Ollama / `llama.cpp`)
 - [ ] OS-level action execution (system commands, application launcher, media control)
