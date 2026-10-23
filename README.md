@@ -1,6 +1,6 @@
 # JARVIS — Local Intelligent Voice Assistant
 
-A private, real-time voice assistant running locally on Windows 11. The project combines the flexibility of Python with high-performance native engines: speech transcription via `whisper.cpp` (C++) and neural speech synthesis via `Piper TTS`, minimizing system resource overhead and eliminating any dependency on external cloud services.
+A private, real-time voice assistant running locally on Windows 11. The project combines the flexibility of Python with high-performance native engines: speech transcription via `whisper.cpp` (C++), neural speech synthesis via `Piper TTS`, and local cognitive reasoning and tool execution via `Ollama` (`llama3.1`), minimizing system resource overhead and eliminating any dependency on external cloud services.
 
 ---
 
@@ -8,11 +8,12 @@ A private, real-time voice assistant running locally on Windows 11. The project 
 
 - **Audio Capture & VAD (Voice Activity Detection):** Continuous audio streaming (16 kHz, 16-bit PCM mono) with dynamic speech/silence detection powered by vectorized RMS computation in NumPy.
 - **Speech Transcription (ASR):** Fast, local inference using a compiled `whisper.cpp` binary (`whisper-cli.exe`) operating on GGML base model format.
+- **Cognitive Reasoning & Intent Parsing (Local LLM):** Fast local LLM inference powered by Ollama (`llama3.1`), generating concise, context-aware spoken responses.
+- **Extensible Tool Registry & Function Calling:** Native LLM tool calling via a clean `@tool` decorator registry (`registry.py`, `tools.py`, `actions.py`), enabling autonomous execution of operating system actions (e.g., launching applications, time queries).
 - **Speech Synthesis (TTS):** Completely offline, low-latency neural text-to-speech using standalone Piper TTS (`piper.exe`) with the Polish `bass-high` voice model (with support for `darkman-medium`), featuring configurable speech rate (`--length-scale`) and software-level volume attenuation.
 - **Conversational Flow & Retry Mechanism:** Interactive voice loop with readiness indicator and automated fallback retry if speech is not detected or unintelligible.
 - **Type Annotations & Documentation:** Fully typed with PEP 484 type hints and documented with Google-style docstrings across all modules.
 - **Wake Word Detection (In Progress):** Lightweight keyword spotting (*"Jarvis"*) running continuously in the background via the ONNX runtime.
-- **Orchestration & Tool Execution (Planned):** Local LLM integration to parse intent and execute operating system tasks and integrations.
 
 ---
 
@@ -23,6 +24,9 @@ jarvis/
 ├── audio.py              # Microphone streaming, vectorized RMS energy calculation, and VAD
 ├── transcriber.py        # Subprocess wrapper for whisper.cpp (whisper-cli.exe)
 ├── tts.py                # Piper neural TTS speech synthesis and synchronous playback
+├── registry.py           # Tool decorator and OpenAI/Ollama function-calling schema builder
+├── tools.py              # Executable system tools and OS integrations (e.g. notepad, time)
+├── actions.py            # Ollama LLM integration, intent routing, and tool invocation
 ├── main.py               # Core application entry point and conversational orchestration loop
 ├── models/               # Model weights (Whisper GGML & Piper ONNX) [git-ignored]
 ├── piper/                # Standalone Piper Windows binary and runtime dependencies [git-ignored]
@@ -35,6 +39,7 @@ jarvis/
 
 - **Operating System:** Windows 11
 - **Python:** 3.10+
+- **LLM Engine:** [Ollama](https://ollama.com) (with `llama3.1` model)
 - **C++ Compiler:** MinGW-w64 (GCC/G++) or Visual Studio Build Tools (MSVC)
 - **Tools:** CMake, Git, `curl`, PowerShell
 
@@ -52,7 +57,7 @@ cd jarvis
 ```powershell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-pip install sounddevice numpy
+pip install sounddevice numpy ollama
 ```
 
 ### 3. Build the C++ Transcription Engine (`whisper.cpp`)
@@ -97,6 +102,13 @@ curl.exe -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/d
 curl.exe -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx.json" -o "models/pl_PL-darkman-medium.onnx.json"
 ```
 
+### 6. Setup Ollama (Llama 3.1)
+Ensure Ollama is installed and pull the required model:
+
+```powershell
+ollama pull llama3.1
+```
+
 ---
 
 ## ▶️ Running the Project
@@ -108,15 +120,40 @@ python tts.py
 ```
 
 ### Run the Core Pipeline
-Run speech recording, silence detection, transcription, and synthesized response:
+Run speech recording, silence detection, transcription, LLM reasoning, and synthesized response:
 ```powershell
 python main.py
 ```
 1. JARVIS announces readiness (*"Jestem gotów!"*).
-2. Speak into your microphone after the `Słucham...` prompt appears.
+2. Speak into your microphone after the `Słucham...` prompt appears (e.g. *"Proszę, otwórz notatnik"* or *"Która jest godzina?"*).
 3. Stop speaking — the Voice Activity Detector (VAD) automatically finalizes recording after ~800 ms of trailing silence.
-4. The audio is transcribed locally using `whisper.cpp`, and JARVIS responds using the neural TTS voice.
-5. If no speech was detected, JARVIS politely prompts for a retry (*"Nie dosłyszałem, powtórz proszę."*) before timing out.
+4. The audio is transcribed locally using `whisper.cpp`, and JARVIS confirms what was heard.
+5. The transcribed text is sent to `llama3.1` via Ollama:
+   - If a system action is requested, the appropriate registered tool function (e.g., `open_notepad`, `get_time`) is executed.
+   - If a general query or conversation is held, the LLM generates a concise reply.
+6. JARVIS vocalizes the response using Piper TTS.
+7. If no speech was detected, JARVIS politely prompts for a retry (*"Nie dosłyszałem, powtórz proszę."*) before standing down.
+
+---
+
+## 🛠️ Adding New Tools
+
+Adding custom tools to JARVIS is straightforward using the `@tool` decorator in `tools.py`:
+
+```python
+from registry import tool
+import subprocess
+
+@tool(
+    name="open_calculator",
+    description="Otwiera kalkulator systemowy. Użyj, gdy użytkownik prosi o włączenie lub otwarcie kalkulatora."
+)
+def open_calculator() -> str:
+    subprocess.Popen(["calc.exe"])
+    return "Kalkulator został otwarty."
+```
+
+Once defined in `tools.py`, the tool is automatically registered in the Ollama function-calling schema without requiring any changes to the core loop.
 
 ---
 
@@ -127,8 +164,10 @@ python main.py
 - [x] WAV buffer conversion and `whisper-cli.exe` integration via `subprocess`
 - [x] Local Text-to-Speech (TTS) synthesis via Piper TTS (`bass-high` & `darkman-medium`)
 - [x] Modular architecture refactoring (`audio.py`, `transcriber.py`, `tts.py`, `main.py`)
-- [x] Comprehensive code documentation and PEP 484 type annotations
+- [x] Comprehensive code documentation and PEP 484 type annotations across all files
 - [x] Conversational retry/fallback logic for missing speech input
+- [x] Local LLM integration (Llama 3.1 via Ollama)
+- [x] Extensible tool registry and function calling (`registry.py`, `tools.py`, `actions.py`)
+- [x] OS-level action execution (System Notepad launcher, real-time clock check)
 - [ ] Background wake word detection (*Wake Word: Jarvis*)
-- [ ] Local LLM integration (e.g., Llama via Ollama / `llama.cpp`)
-- [ ] OS-level action execution (system commands, application launcher, media control)
+- [ ] Expanded OS integrations (volume control, browser search, media controls)
