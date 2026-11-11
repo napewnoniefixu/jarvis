@@ -8,23 +8,17 @@ software volume control, and played synchronously via `sounddevice` without
 disk I/O.
 """
 
-from pathlib import Path
 import subprocess
 import numpy as np
 import sounddevice as sd
 
-# --- Engine & File Paths ---
-BASE_DIR: Path = Path(__file__).resolve().parent
-PIPER_EXE: Path = BASE_DIR / "piper" / "piper.exe"
-MODEL_PATH: Path = BASE_DIR / "models" / "pl_PL-bass-high.onnx"
-
-# --- Audio Playback & Synthesis Settings ---
-SAMPLE_RATE: int = 22050  # Sampling rate produced by the Piper Polish voice model (Hz)
-DEFAULT_VOLUME: float = 0.3  # Software attenuation factor (0.0 to 1.0)
-DEFAULT_LENGTH_SCALE: str = "0.85"  # Speech rate: < 1.0 speeds up voice output (0.85 = ~15% faster)
+from config import (
+    PIPER_EXE_PATH, TTS_MODEL_PATH,
+    TTS_SAMPLE_RATE, TTS_VOLUME, TTS_LENGTH_SCALE,
+)
 
 
-def speak(text: str, volume: float = DEFAULT_VOLUME) -> None:
+def speak(text: str, volume: float = TTS_VOLUME) -> None:
     """Synthesize speech from input text using Piper and stream audio to playback.
 
     Invokes `piper.exe` via a subprocess with `--output_raw`, pipe-streams input
@@ -35,36 +29,43 @@ def speak(text: str, volume: float = DEFAULT_VOLUME) -> None:
     Args:
         text (str): Sentence or phrase to synthesize into speech.
         volume (float, optional): Software volume scaling factor between 0.0 and 1.0.
-            Defaults to DEFAULT_VOLUME (0.3).
+            Defaults to TTS_VOLUME from config.
     """
     print(f"\n[JARVIS]: {text}")
 
     cmd = [
-        str(PIPER_EXE),
-        "-m", str(MODEL_PATH),
+        str(PIPER_EXE_PATH),
+        "-m", str(TTS_MODEL_PATH),
         "--output_raw",
-        "--length-scale", DEFAULT_LENGTH_SCALE,
+        "--length-scale", str(TTS_LENGTH_SCALE),
     ]
 
-    process = subprocess.Popen(
-        cmd,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-    )
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
 
-    raw_audio, _ = process.communicate(input=text.encode("utf-8"))
+        raw_audio, _ = process.communicate(input=text.encode("utf-8"))
 
-    # Convert raw 16-bit signed PCM buffer to NumPy array
-    audio_data = np.frombuffer(raw_audio, dtype=np.int16)
+        if not raw_audio:
+            print("[ERROR] Piper returned no audio data.")
+            return
 
-    # Normalize samples to [-1.0, 1.0] float32 range and apply volume attenuation
-    audio_float = (audio_data.astype(np.float32) / 32768.0) * volume
+        audio_data = np.frombuffer(raw_audio, dtype=np.int16)
 
-    # Synchronous audio playback
-    sd.play(audio_float, samplerate=SAMPLE_RATE)
-    sd.wait()
+        audio_float = (audio_data.astype(np.float32) / 32768.0) * volume
+
+        sd.play(audio_float, samplerate=TTS_SAMPLE_RATE)
+        sd.wait()
+
+    except FileNotFoundError:
+        print(f"[ERROR] Piper executable not found at: {PIPER_EXE_PATH}")
+    except Exception as e:
+        print(f"[ERROR] TTS synthesis failed: {e}")
 
 
 if __name__ == "__main__":
-    speak("Inicjalizacja modułu mowy zakończona. Przesyłanie strumieniowe działa poprawnie.")
+    speak("Inicjalizacja modułu mowy zakończona. Przesyłanie strumieniowe działa poprawnie.")

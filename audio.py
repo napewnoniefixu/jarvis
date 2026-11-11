@@ -12,21 +12,11 @@ import numpy as np
 import sounddevice as sd
 import wave
 
-# --- Audio Stream Configuration ---
-SAMPLE_RATE: int = 16000  # Sampling frequency in Hz (16 kHz required by whisper.cpp)
-CHANNELS: int = 1  # Mono recording channel
-DTYPE: str = 'float32'  # Data type for captured raw audio buffers
-BLOCKSIZE: int = 1600  # Number of samples per buffer chunk (1600 / 16000 = 100 ms)
-
-# --- Voice Activity Detection (VAD) Tuning ---
-# RMS amplitude threshold above which input is classified as active speech
-THRESHOLD: float = 0.003
-
-# Maximum consecutive silent frames allowed after speech begins before stopping (8 * 100 ms = ~800 ms)
-SILENCE_LIMIT_FRAMES: int = 8
-
-# Maximum consecutive silent frames before timing out if no speech is detected (50 * 100 ms = ~5.0 s)
-MAX_INITIAL_SILENCE_FRAMES: int = 50
+from config import (
+    SAMPLE_RATE, CHANNELS, AUDIO_DTYPE, BLOCKSIZE,
+    VAD_THRESHOLD, SILENCE_LIMIT_FRAMES, MAX_INITIAL_SILENCE_FRAMES,
+    TEMP_COMMAND_WAV,
+)
 
 
 def calculate_RMS(audio_chunk: np.ndarray) -> float:
@@ -49,10 +39,11 @@ def record_command() -> np.ndarray:
 
     Opens an audio input stream and continuously buffers audio chunks. Recording
     starts in a listening state and monitors energy level:
-    - If energy exceeds `THRESHOLD`, speech is marked as started.
+    - If energy exceeds the configured VAD threshold, speech is marked as started.
     - Once speech has begun, recording ends automatically when silence persists
-      for more than `SILENCE_LIMIT_FRAMES` chunks (~800 ms).
-    - If no speech occurs within 50 chunks (~5 seconds), recording times out.
+      for more than SILENCE_LIMIT_FRAMES chunks (~800 ms).
+    - If no speech occurs within MAX_INITIAL_SILENCE_FRAMES chunks (~5 seconds),
+      recording times out.
 
     Returns:
         np.ndarray: Concatenated float32 audio samples representing the complete recording.
@@ -61,14 +52,14 @@ def record_command() -> np.ndarray:
     has_spoken = False
     silence_frames = 0
 
-    with sd.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE, blocksize=BLOCKSIZE) as stream:
+    with sd.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=AUDIO_DTYPE, blocksize=BLOCKSIZE) as stream:
         while True:
             data, _ = stream.read(BLOCKSIZE)
             frames.append(data.copy())
 
             current_rms = calculate_RMS(data)
 
-            if current_rms > THRESHOLD:
+            if current_rms > VAD_THRESHOLD:
                 has_spoken = True
                 silence_frames = 0
             else:
@@ -85,7 +76,7 @@ def record_command() -> np.ndarray:
     return full_audio
 
 
-def save_wav(audio_data: np.ndarray, filename: Union[str, Path] = "temp_command.wav") -> None:
+def save_wav(audio_data: np.ndarray, filename: Union[str, Path] = TEMP_COMMAND_WAV) -> None:
     """Export normalized float32 audio data to a 16-bit PCM WAV file.
 
     Scales floating point values in the range [-1.0, 1.0] to 16-bit signed
@@ -95,7 +86,7 @@ def save_wav(audio_data: np.ndarray, filename: Union[str, Path] = "temp_command.
     Args:
         audio_data (np.ndarray): Array of float32 audio samples to export.
         filename (Union[str, Path], optional): Output file destination.
-            Defaults to "temp_command.wav".
+            Defaults to TEMP_COMMAND_WAV from config.
     """
     audio_data_int16 = (audio_data * 32767).astype(np.int16)
 

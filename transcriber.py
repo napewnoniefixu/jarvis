@@ -9,15 +9,13 @@ from pathlib import Path
 import subprocess
 from typing import Optional, Union
 
-# --- Transcription Engine Configuration ---
-BASE_DIR: Path = Path(__file__).resolve().parent
-WHISPER_CLI_PATH: Path = BASE_DIR / "whisper.cpp" / "build" / "bin" / "whisper-cli.exe"
-MODEL_PATH: Path = BASE_DIR / "models" / "ggml-base.bin"
-DEFAULT_LANGUAGE: str = "pl"
-DEFAULT_THREADS: str = "8"
+from config import (
+    WHISPER_CLI_PATH, WHISPER_MODEL_PATH,
+    WHISPER_LANGUAGE, WHISPER_THREADS, TEMP_COMMAND_WAV,
+)
 
 
-def transcribe(filename: Union[str, Path] = "temp_command.wav") -> Optional[str]:
+def transcribe(filename: Union[str, Path] = TEMP_COMMAND_WAV) -> Optional[str]:
     """Transcribe a WAV audio file into text using whisper.cpp CLI.
 
     Executes the native `whisper-cli.exe` inference binary with parameters configured
@@ -31,7 +29,7 @@ def transcribe(filename: Union[str, Path] = "temp_command.wav") -> Optional[str]
 
     Args:
         filename (Union[str, Path], optional): Path to the WAV file to transcribe.
-            Defaults to "temp_command.wav".
+            Defaults to TEMP_COMMAND_WAV from config.
 
     Returns:
         Optional[str]: Normalized (lowercase, stripped) transcribed text if
@@ -39,17 +37,21 @@ def transcribe(filename: Union[str, Path] = "temp_command.wav") -> Optional[str]
     """
     cmd = [
         str(WHISPER_CLI_PATH),
-        "-m", str(MODEL_PATH),
+        "-m", str(WHISPER_MODEL_PATH),
         "-f", str(filename),
-        "-l", DEFAULT_LANGUAGE,
+        "-l", WHISPER_LANGUAGE,
         "--no-timestamps",
-        "-t", DEFAULT_THREADS,
+        "-t", str(WHISPER_THREADS),
         "--suppress-nst",
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=30)
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        print(f"[ERROR] Whisper transcription failed: {e}")
+        return None
 
     if result.returncode == 0 and result.stdout:
         return result.stdout.strip().lower()
 
-    return None
+    return None

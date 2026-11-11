@@ -7,7 +7,13 @@ to register it with the function calling system in `registry.py`.
 
 from datetime import datetime
 import subprocess
+import webbrowser
 from registry import tool
+
+
+# =============================================================================
+# Conversational Tools
+# =============================================================================
 
 @tool(
     name="zwykla_odpowiedz",
@@ -37,22 +43,15 @@ def zwykla_odpowiedz(tekst_dla_uzytkownika: str) -> str:
     """
     return tekst_dla_uzytkownika
 
-@tool(
-    name="open_notepad", 
-    description="Otwiera systemowy edytor tekstu (notatnik). Użyj TYLKO gdy użytkownik jawnie prosi o otwarcie, włączenie lub uruchomienie notatnika.")
-def open_notepad() -> str:
-    """Launch the Windows Notepad application as a background subprocess.
 
-    Returns:
-        str: Spoken confirmation message indicating the action was performed.
-    """
-    subprocess.Popen(["notepad.exe"])
-    return "Notatnik został otwarty."
-
+# =============================================================================
+# Time & Date Tools
+# =============================================================================
 
 @tool(
-    name="get_time", 
-    description="Zwraca aktualną godzinę. UŻYJ TYLKO I WYŁĄCZNIE, gdy użytkownik zada wprost pytanie: 'która godzina?' lub 'jaki mamy czas?'. ABSOLUTNIE NIE UŻYWAJ tego narzędzia do odpowiedzi na powitania, zwroty typu 'co u ciebie' lub w luźnej rozmowie. W takich sytuacjach zignoruj narzędzie i odpowiedz po prostu tekstem.")
+    name="get_time",
+    description="Zwraca aktualną godzinę. Użyj TYLKO gdy użytkownik pyta o godzinę, np. 'która godzina?', 'jaki mamy czas?'."
+)
 def get_time() -> str:
     """Retrieve the current system time formatted as a natural Polish sentence.
 
@@ -61,3 +60,217 @@ def get_time() -> str:
     """
     now = datetime.now()
     return f"Jest godzina {now.hour}:{now.minute:02d}."
+
+
+@tool(
+    name="get_date",
+    description="Zwraca aktualną datę. Użyj gdy użytkownik pyta o dzisiejszą datę, dzień tygodnia, lub jaki mamy dzień."
+)
+def get_date() -> str:
+    """Retrieve the current system date formatted as a natural Polish sentence.
+
+    Returns:
+        str: Current date response string with day of week and full date.
+    """
+    days_pl = {
+        0: "poniedziałek", 1: "wtorek", 2: "środa", 3: "czwartek",
+        4: "piątek", 5: "sobota", 6: "niedziela"
+    }
+    months_pl = {
+        1: "stycznia", 2: "lutego", 3: "marca", 4: "kwietnia",
+        5: "maja", 6: "czerwca", 7: "lipca", 8: "sierpnia",
+        9: "września", 10: "października", 11: "listopada", 12: "grudnia"
+    }
+    now = datetime.now()
+    day_name = days_pl[now.weekday()]
+    month_name = months_pl[now.month]
+    return f"Dziś jest {day_name}, {now.day} {month_name} {now.year} roku."
+
+
+# =============================================================================
+# Application Launchers
+# =============================================================================
+
+@tool(
+    name="open_app",
+    description="Otwiera aplikację na komputerze po nazwie. Użyj gdy użytkownik prosi o otwarcie, włączenie lub uruchomienie dowolnej aplikacji (np. notatnik, kalkulator, przeglądarka, paint, terminal, steam (wymawiane 'stim')).",
+    parameters={
+        "type": "object",
+        "properties": {
+            "app_name": {
+                "type": "string",
+                "description": "Nazwa pliku wykonywalnego aplikacji, np. 'notepad.exe', 'calc.exe', 'mspaint.exe', 'cmd.exe', 'explorer.exe', 'msedge.exe'."
+            }
+        },
+        "required": ["app_name"]
+    }
+)
+def open_app(app_name: str) -> str:
+    """Launch an application by its executable name as a background subprocess.
+
+    Args:
+        app_name (str): Name of the executable to launch (e.g. 'notepad.exe').
+
+    Returns:
+        str: Spoken confirmation or error message.
+    """
+    if '\\' in app_name or '/' in app_name:
+        return "Przepraszam, nie mogę uruchomić aplikacji z podaną ścieżką."
+
+    try:
+        subprocess.Popen([app_name])
+        friendly_name = app_name.replace('.exe', '').replace('.', ' ').capitalize()
+        return f"{friendly_name} został otwarty."
+    except FileNotFoundError:
+        return f"Nie znalazłem aplikacji o nazwie {app_name}."
+    except OSError as e:
+        return f"Nie udało się otworzyć aplikacji: {e}"
+
+
+@tool(
+    name="close_app",
+    description="Zamyka uruchomioną aplikację po nazwie procesu. Użyj gdy użytkownik prosi o zamknięcie, wyłączenie lub zabicie aplikacji.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "process_name": {
+                "type": "string",
+                "description": "Nazwa procesu do zamknięcia, np. 'notepad.exe', 'calc.exe', 'mspaint.exe'."
+            }
+        },
+        "required": ["process_name"]
+    }
+)
+def close_app(process_name: str) -> str:
+    """Terminate a running application by its process name using taskkill.
+
+    Args:
+        process_name (str): Name of the process to terminate (e.g. 'notepad.exe').
+
+    Returns:
+        str: Spoken confirmation or error message.
+    """
+    try:
+        result = subprocess.run(
+            ["taskkill", "/im", process_name, "/f"],
+            capture_output=True, text=True, encoding="utf-8"
+        )
+        if result.returncode == 0:
+            friendly_name = process_name.replace('.exe', '').capitalize()
+            return f"{friendly_name} został zamknięty."
+        else:
+            return f"Nie udało się zamknąć {process_name}. Może nie jest uruchomiony?"
+    except Exception as e:
+        return f"Błąd przy zamykaniu aplikacji: {e}"
+
+
+# =============================================================================
+# Web & Search Tools
+# =============================================================================
+
+@tool(
+    name="search_web",
+    description="Wyszukuje frazę w Google za pomocą domyślnej przeglądarki. Użyj gdy użytkownik prosi o wyszukanie, znalezienie lub sprawdzenie czegoś w internecie.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Fraza do wyszukania w Google."
+            }
+        },
+        "required": ["query"]
+    }
+)
+def search_web(query: str) -> str:
+    """Open a Google search in the default browser for the given query.
+
+    Args:
+        query (str): Search phrase to look up.
+
+    Returns:
+        str: Spoken confirmation message.
+    """
+    url = f"https://www.google.com/search?q={query}"
+    webbrowser.open(url)
+    return f"Wyszukuję: {query}"
+
+
+@tool(
+    name="open_website",
+    description="Otwiera stronę internetową w domyślnej przeglądarce. Użyj gdy użytkownik prosi o otwarcie konkretnej strony (np. YouTube, Gmail, Facebook).",
+    parameters={
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+                "description": "Adres URL strony do otwarcia, np. 'https://youtube.com'."
+            }
+        },
+        "required": ["url"]
+    }
+)
+def open_website(url: str) -> str:
+    """Open a website URL in the default browser.
+
+    Args:
+        url (str): Full URL to open.
+
+    Returns:
+        str: Spoken confirmation message.
+    """
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+    webbrowser.open(url)
+    return f"Otwieram stronę."
+
+
+# =============================================================================
+# System Information Tools
+# =============================================================================
+
+@tool(
+    name="system_command",
+    description="Wykonuje bezpieczne polecenie systemowe i zwraca jego wynik. Użyj gdy użytkownik pyta o informacje systemowe, np. 'ile mam RAM-u?', 'jaki mam procesor?', 'jaki jest mój IP?'. Dozwolone komendy: systeminfo, ipconfig, hostname, whoami, tasklist.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "command": {
+                "type": "string",
+                "description": "Polecenie systemowe do wykonania. TYLKO: systeminfo, ipconfig, hostname, whoami, tasklist."
+            }
+        },
+        "required": ["command"]
+    }
+)
+def system_command(command: str) -> str:
+    """Execute a whitelisted system command and return its output.
+
+    Only allows a predefined set of safe, read-only commands to prevent
+    accidental or malicious system modifications.
+
+    Args:
+        command (str): System command to execute.
+
+    Returns:
+        str: Command output or error message.
+    """
+    allowed_commands = {"systeminfo", "ipconfig", "hostname", "whoami", "tasklist"}
+    base_command = command.strip().split()[0].lower()
+
+    if base_command not in allowed_commands:
+        return f"Przepraszam, komenda '{command}' nie jest dozwolona ze względów bezpieczeństwa."
+
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True,
+            encoding="utf-8", shell=True, timeout=15
+        )
+        output = result.stdout.strip()
+        if len(output) > 500:
+            output = output[:500] + "... (skrócono)"
+        return output if output else "Komenda nie zwróciła żadnych danych."
+    except subprocess.TimeoutExpired:
+        return "Komenda przekroczyła limit czasu."
+    except Exception as e:
+        return f"Błąd przy wykonywaniu komendy: {e}"
