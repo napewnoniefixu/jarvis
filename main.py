@@ -43,7 +43,11 @@ def main() -> None:
     while True:
         try:
             print("\nSłucham...")
-            audio = record_command()
+            audio, has_spoken = record_command()
+            if not has_spoken:
+                speak("Nie dosłyszałem, powtórz proszę.")
+                continue
+            
             save_wav(audio)
 
             print("Przetwarzam...")

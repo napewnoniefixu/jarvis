@@ -34,7 +34,7 @@ def calculate_RMS(audio_chunk: np.ndarray) -> float:
     return float(np.sqrt(np.mean(audio_chunk**2)))
 
 
-def record_command() -> np.ndarray:
+def record_command() -> tuple[np.ndarray, bool]:
     """Record speech from the default microphone using dynamic silence detection.
 
     Opens an audio input stream and continuously buffers audio chunks. Recording
@@ -73,7 +73,7 @@ def record_command() -> np.ndarray:
                         break
     
     full_audio = np.concatenate(frames, axis=0)
-    return full_audio
+    return full_audio, has_spoken
 
 
 def save_wav(audio_data: np.ndarray, filename: Union[str, Path] = TEMP_COMMAND_WAV) -> None:
