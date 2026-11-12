@@ -38,15 +38,18 @@ def record_command() -> tuple[np.ndarray, bool]:
     """Record speech from the default microphone using dynamic silence detection.
 
     Opens an audio input stream and continuously buffers audio chunks. Recording
-    starts in a listening state and monitors energy level:
-    - If energy exceeds the configured VAD threshold, speech is marked as started.
-    - Once speech has begun, recording ends automatically when silence persists
-      for more than SILENCE_LIMIT_FRAMES chunks (~800 ms).
+    starts in a listening state and monitors energy levels:
+    - If RMS energy exceeds VAD_THRESHOLD, speech is marked as started.
+    - Once speech has begun, recording ends when silence persists for more than
+      SILENCE_LIMIT_FRAMES chunks (~800 ms).
     - If no speech occurs within MAX_INITIAL_SILENCE_FRAMES chunks (~5 seconds),
       recording times out.
 
     Returns:
-        np.ndarray: Concatenated float32 audio samples representing the complete recording.
+        tuple[np.ndarray, bool]: A tuple where:
+            - np.ndarray: Concatenated float32 audio samples of the recording.
+            - bool: True if speech was detected above the threshold, False if
+              the recording timed out without speech.
     """
     frames = []
     has_spoken = False

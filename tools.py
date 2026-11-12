@@ -106,13 +106,17 @@ def get_date() -> str:
     }
 )
 def open_app(app_name: str) -> str:
-    """Launch an application by its executable name as a background subprocess.
+    """Launch an application by executable name as a background subprocess.
+
+    Rejects executable names containing path separators ('/' or '\\') to prevent
+    arbitrary directory traversal and only launches programs discoverable via PATH
+    or standard Windows application registrations.
 
     Args:
-        app_name (str): Name of the executable to launch (e.g. 'notepad.exe').
+        app_name (str): Name of the executable to launch (e.g. 'notepad.exe', 'calc.exe').
 
     Returns:
-        str: Spoken confirmation or error message.
+        str: Spoken confirmation or error message in Polish.
     """
     if '\\' in app_name or '/' in app_name:
         return "Przepraszam, nie mogę uruchomić aplikacji z podaną ścieżką."
@@ -142,13 +146,15 @@ def open_app(app_name: str) -> str:
     }
 )
 def close_app(process_name: str) -> str:
-    """Terminate a running application by its process name using taskkill.
+    """Terminate a running application by process name using Windows taskkill.
+
+    Runs `taskkill /im <process_name> /f` to terminate all matching process instances.
 
     Args:
-        process_name (str): Name of the process to terminate (e.g. 'notepad.exe').
+        process_name (str): Name of the process image to terminate (e.g. 'notepad.exe').
 
     Returns:
-        str: Spoken confirmation or error message.
+        str: Spoken confirmation or error message in Polish.
     """
     try:
         result = subprocess.run(
@@ -183,13 +189,13 @@ def close_app(process_name: str) -> str:
     }
 )
 def search_web(query: str) -> str:
-    """Open a Google search in the default browser for the given query.
+    """Open a Google search query in the system's default web browser.
 
     Args:
-        query (str): Search phrase to look up.
+        query (str): Search term or phrase to look up.
 
     Returns:
-        str: Spoken confirmation message.
+        str: Spoken confirmation message in Polish.
     """
     url = f"https://www.google.com/search?q={query}"
     webbrowser.open(url)
@@ -211,13 +217,15 @@ def search_web(query: str) -> str:
     }
 )
 def open_website(url: str) -> str:
-    """Open a website URL in the default browser.
+    """Open a website URL in the default web browser.
+
+    Automatically prepends 'https://' if the URL does not begin with an HTTP/HTTPS scheme.
 
     Args:
-        url (str): Full URL to open.
+        url (str): Destination web address to open (e.g. 'youtube.com' or 'https://google.com').
 
     Returns:
-        str: Spoken confirmation message.
+        str: Spoken confirmation message in Polish.
     """
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
@@ -244,16 +252,18 @@ def open_website(url: str) -> str:
     }
 )
 def system_command(command: str) -> str:
-    """Execute a whitelisted system command and return its output.
+    """Execute a whitelisted system diagnostic command and return its output.
 
-    Only allows a predefined set of safe, read-only commands to prevent
-    accidental or malicious system modifications.
+    Enforces a strict whitelist of safe, read-only Windows utility commands
+    ('systeminfo', 'ipconfig', 'hostname', 'whoami', 'tasklist') to prevent
+    unintended modifications or execution of arbitrary commands. Truncates
+    output to 500 characters to keep responses manageable.
 
     Args:
-        command (str): System command to execute.
+        command (str): System command string to execute.
 
     Returns:
-        str: Command output or error message.
+        str: Captured command stdout or error message in Polish.
     """
     allowed_commands = {"systeminfo", "ipconfig", "hostname", "whoami", "tasklist"}
     base_command = command.strip().split()[0].lower()

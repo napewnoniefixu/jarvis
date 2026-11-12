@@ -14,7 +14,6 @@ import tools  # Ensures all @tool decorators execute and register on startup
 
 from config import LLM_MODEL, LLM_SYSTEM_PROMPT, LLM_FALLBACK_RESPONSE, MAX_HISTORY_MESSAGES
 
-# --- Conversation History ---
 # Rolling message buffer that enables multi-turn context retention.
 # Initialized with the system prompt; user/assistant messages are appended
 # on each turn and trimmed to MAX_HISTORY_MESSAGES to prevent unbounded growth.
@@ -55,14 +54,18 @@ def execute_command(user_text: str) -> str:
     - Returns the tool's execution result.
     If no tool call is requested, returns the model's direct conversational reply.
 
-    The user message and assistant response are appended to conversation_history
-    to enable multi-turn context retention.
+    Appends both the user prompt and the resulting assistant response to
+    `conversation_history` to maintain multi-turn conversational context, then
+    trims history if it exceeds `MAX_HISTORY_MESSAGES`.
 
     Args:
         user_text (str): Transcribed speech input received from the user.
 
     Returns:
         str: Response text to be spoken back to the user via TTS.
+
+    Raises:
+        ConnectionError: If communication with the Ollama service fails.
     """
     # Append user message to history
     conversation_history.append({'role': 'user', 'content': user_text})

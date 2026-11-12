@@ -1,118 +1,82 @@
-# JARVIS — Local Intelligent Voice Assistant
+# JARVIS
 
-[![Platform](https://img.shields.io/badge/Platform-Windows%2011-blue?logo=windows)](https://microsoft.com/windows)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://python.org)
-[![Whisper.cpp](https://img.shields.io/badge/ASR-whisper.cpp%20(C%2B%2B)-green)](https://github.com/ggerganov/whisper.cpp)
-[![Piper TTS](https://img.shields.io/badge/TTS-Piper%20(In--Memory%20Streaming)-orange)](https://github.com/rhasspy/piper)
-[![Ollama](https://img.shields.io/badge/LLM-Ollama%20(Llama%203.1)-purple)](https://ollama.com)
-
-A private, real-time voice assistant running 100% locally on Windows 11. JARVIS combines high-performance native engines with the flexibility of Python: speech transcription via compiled `whisper.cpp` (C++), cognitive reasoning and function-calling via `Ollama` (`llama3.1`), and neural speech synthesis via standalone `Piper TTS` streaming raw PCM audio directly in-memory without disk overhead.
+A local voice assistant for Windows that runs entirely on your own computer. There are no cloud APIs, external subscriptions, or third-party tracking. It listens to your microphone, transcribes your speech locally, figures out what you want using a local language model, runs system commands or tools, and speaks the answer back to you in Polish.
 
 ---
 
-## 🚀 Architecture & Core Features
+## How It Works
 
-```mermaid
-flowchart TD
-    Mic["🎤 Microphone"] -->|"16 kHz Mono PCM"| Audio["audio.py (RMS Voice Activity Detection)"]
-    Audio -->|"Speech Finalized"| WAV["temp_command.wav"]
-    WAV --> Transcriber["transcriber.py (whisper.cpp C++ CLI)"]
-    Transcriber -->|"Transcribed Polish Text"| Actions["actions.py (Ollama Llama 3.1)"]
-    
-    Actions -->|"Function Call"| Registry{"registry.py (Tool Router)"}
-    Registry -->|"open_notepad"| ToolNotepad["tools.py (notepad.exe)"]
-    Registry -->|"get_time"| ToolTime["tools.py (system clock)"]
-    Registry -->|"zwykla_odpowiedz"| ToolChat["tools.py (conversational response)"]
-    
-    Actions -->|"Direct Text or Tool Result"| TTS["tts.py (Piper TTS Engine)"]
-    ToolNotepad -->|"Confirmation"| TTS
-    ToolTime -->|"Time String"| TTS
-    ToolChat -->|"Spoken Reply"| TTS
-    
-    TTS -->|"Raw PCM stdout stream"| Buffer["In-Memory NumPy Float32 Buffer"]
-    Buffer -->|"Software Volume Scaling"| Playback["sounddevice.play (22.05 kHz)"]
-    Playback --> Speaker["🔊 Speakers"]
-```
-
-- **Audio Capture & VAD (Voice Activity Detection):** Continuous 16 kHz 16-bit mono audio streaming via `sounddevice`. Employs vectorized Root Mean Square (RMS) energy analysis with dynamic thresholding to detect speech onset and automatically cut off recording after ~800 ms of trailing silence (or a ~5.0 s timeout if no speech is detected).
-- **Speech Transcription (ASR):** High-speed local Automatic Speech Recognition powered by a locally compiled C++ `whisper.cpp` (`whisper-cli.exe`) binary running the GGML `base` model with multi-threading and non-speech token suppression (`--suppress-nst`).
-- **Cognitive Reasoning & Native Function Calling:** Intent classification and dialogue generation powered locally by `Ollama` running `llama3.1`. Employs structured system instructions and native tool-calling schemas to automatically route queries to Python actions or conversational handlers.
-- **Extensible Tool Registry & Schema Builder:** Decorator-based registry (`@tool`) supporting arbitrary OpenAI/Ollama-compliant JSON Schema parameters (`registry.py`). Extracts function arguments dynamically and executes functions with `**arguments`.
-- **Built-in System & Conversational Tools:**
-  - `open_notepad`: Launches the Windows Notepad application as a background subprocess.
-  - `get_time`: Queries the system clock and formats the current time in Polish.
-  - `zwykla_odpowiedz`: Structured conversational response handler for natural dialogue, greetings, and jokes.
-- **Zero-Disk-I/O In-Memory Neural TTS:** Offline neural speech synthesis via standalone `Piper TTS` (`piper.exe`) with the Polish `pl_PL-bass-high` voice model (supports `darkman-medium`). Streams raw 16-bit PCM bytes via standard output (`--output_raw`), converts in-memory into normalized float32 samples in NumPy, applies software volume attenuation, and plays synchronously via `sounddevice` at 22050 Hz without writing temporary WAV files to disk.
-- **Conversational Resilience:** Interactive conversational loop with an initial voice greeting (*"Witam szefie, co robimy?"*), console transcription display, and automatic fallback retry prompting (*"Nie dosłyszałem, powtórz proszę."*) before standing down.
-- **Strict Code Quality:** Fully typed with PEP 484 type annotations and documented with Google-style docstrings across all modules.
+1. **Listening**: Captures audio from your microphone and monitors sound levels. When you finish speaking, it automatically detects silence and finishes recording.
+2. **Transcription**: Converts the recorded audio to text using a locally compiled `whisper.cpp` engine.
+3. **Reasoning and Function Calling**: Passes your words to Ollama running `llama3.1`. The model maintains conversation history and either answers directly or triggers a specific Python tool.
+4. **Tool Execution**: Runs system tasks like launching or closing applications, searching the web, checking the time or date, and gathering basic system information.
+5. **Speech Synthesis**: Streams the reply through Piper TTS directly in memory and plays it through your speakers.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```text
 jarvis/
-├── audio.py              # Microphone streaming, vectorized RMS energy analysis, and VAD
-├── transcriber.py        # Subprocess wrapper for native whisper.cpp (whisper-cli.exe)
-├── tts.py                # In-memory raw PCM streaming Piper neural TTS synthesis & playback
-├── registry.py           # Tool decorator and OpenAI/Ollama function-calling schema builder
-├── tools.py              # Executable system tools and OS integrations (Notepad, Clock, Chat)
-├── actions.py            # Ollama LLM integration, intent routing, and tool invocation
-├── main.py               # Core application entry point and conversational orchestration loop
-├── models/               # Model weights (Whisper GGML & Piper ONNX) [git-ignored]
-│   ├── ggml-base.bin
-│   ├── pl_PL-bass-high.onnx
-│   └── pl_PL-bass-high.onnx.json
-├── piper/                # Standalone Piper Windows binary and dependencies [git-ignored]
-│   └── piper.exe
-└── whisper.cpp/          # Locally compiled C++ speech recognition engine [git-ignored]
-    └── build/bin/whisper-cli.exe
+├── config.py         Central configuration (thresholds, models, paths, prompts)
+├── audio.py          Microphone capture and voice activity detection (VAD)
+├── transcriber.py    Speech-to-text wrapper using whisper.cpp
+├── tts.py            Text-to-speech using Piper and sounddevice
+├── registry.py       Tool registration decorator and Ollama tool schema builder
+├── tools.py          Executable system and conversational tools
+├── actions.py        Ollama integration, history management, and tool routing
+├── main.py           Main application loop and voice interaction flow
+├── requirements.txt  Python package dependencies
+├── models/           Whisper and Piper model files (ignored in git)
+└── piper/            Piper executable and runtime libraries (ignored in git)
 ```
 
 ---
 
-## 🛠️ System Requirements
+## Prerequisites
 
-- **Operating System:** Windows 11 (64-bit)
-- **Python:** 3.10+
-- **LLM Engine:** [Ollama](https://ollama.com) with the `llama3.1` model installed
-- **C++ Compiler:** MinGW-w64 (GCC/G++) or Visual Studio Build Tools (MSVC)
-- **Tools:** CMake, Git, `curl`, PowerShell
+- Windows 10 or 11 (64-bit)
+- Python 3.10 or newer
+- [Ollama](https://ollama.com) installed and running
+- C++ compiler (MinGW-w64 or Visual Studio Build Tools) and CMake (to build whisper.cpp)
+- `curl` and PowerShell (standard on modern Windows)
 
 ---
 
-## 📦 Installation & Setup
+## Setup Guide
 
 ### 1. Clone the repository
+
 ```powershell
 git clone https://github.com/napewnoniefixu/jarvis.git
 cd jarvis
 ```
 
-### 2. Set Up Python Virtual Environment
+### 2. Set up a Python virtual environment
+
 ```powershell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-pip install sounddevice numpy ollama
+pip install -r requirements.txt
 ```
 
-### 3. Build the C++ Transcription Engine (`whisper.cpp`)
-Compile the native `whisper.cpp` engine locally:
+### 3. Build whisper.cpp
+
+Compile the C++ transcription binary:
 
 ```powershell
-# Clone the whisper.cpp repository
 git clone https://github.com/ggerganov/whisper.cpp.git
 cd whisper.cpp
-
-# Configure and compile using MinGW
 cmake -B build -G "MinGW Makefiles"
 cmake --build build --config Release
-
 cd ..
 ```
 
-### 4. Setup Piper TTS Engine
-Download and extract the standalone Piper Windows binary release into the `piper/` folder:
+This produces `whisper.cpp/build/bin/whisper-cli.exe`.
+
+### 4. Download Piper TTS
+
+Download the standalone Piper release for Windows and extract it into a `piper` directory:
 
 ```powershell
 curl.exe -L "https://github.com/rhasspy/piper/releases/latest/download/piper_windows_amd64.zip" -o "piper_windows.zip"
@@ -120,26 +84,26 @@ Expand-Archive -Path "piper_windows.zip" -DestinationPath "."
 Remove-Item "piper_windows.zip"
 ```
 
-### 5. Download Model Weights
-All weights are stored in the `models/` directory (excluded from version control):
+The executable will be located at `piper/piper.exe`.
+
+### 5. Download Model Files
+
+Create the `models` folder and download the Whisper GGML model and Piper voice files:
 
 ```powershell
 if (!(Test-Path -Path "models")) { New-Item -ItemType Directory -Path "models" }
 
-# Whisper ASR model (~140 MB)
+# Whisper base model (~140 MB)
 curl.exe -L "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin" -o "models/ggml-base.bin"
 
-# Piper TTS Polish Bass voice model (Default, ~114 MB + config)
+# Piper Polish voice model (bass-high, ~114 MB + JSON config)
 curl.exe -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/bass/high/pl_PL-bass-high.onnx" -o "models/pl_PL-bass-high.onnx"
 curl.exe -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/bass/high/pl_PL-bass-high.onnx.json" -o "models/pl_PL-bass-high.onnx.json"
-
-# (Optional) Piper TTS Polish Darkman voice model (~63 MB + config)
-curl.exe -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx" -o "models/pl_PL-darkman-medium.onnx"
-curl.exe -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/pl/pl_PL/darkman/medium/pl_PL-darkman-medium.onnx.json" -o "models/pl_PL-darkman-medium.onnx.json"
 ```
 
-### 6. Setup Ollama (Llama 3.1)
-Ensure Ollama is running and download the model:
+### 6. Pull the Llama 3.1 Model in Ollama
+
+Make sure Ollama is running, then pull the model:
 
 ```powershell
 ollama pull llama3.1
@@ -147,95 +111,107 @@ ollama pull llama3.1
 
 ---
 
-## ▶️ Running the Project
+## Running the Assistant
 
-### Test Text-to-Speech (TTS)
-Verify low-latency in-memory speech synthesis and audio playback in isolation:
+### Test Text-to-Speech
+
+Before running the full loop, verify that audio output and Piper work properly:
+
 ```powershell
 python tts.py
 ```
-*Output:*
-```text
-[JARVIS]: Inicjalizacja modułu mowy zakończona. Przesyłanie strumieniowe działa poprawnie.
-```
 
-### Run the Core Voice Loop
-Launch the complete voice assistant:
+You should hear a confirmation phrase through your speakers.
+
+### Start JARVIS
+
+Launch the assistant loop:
+
 ```powershell
 python main.py
 ```
 
-### Execution Flow:
-1. **Greeting:** JARVIS vocalizes readiness (*"Witam szefie, co robimy?"*).
-2. **Listening:** Terminal displays `Słucham...` as the microphone opens.
-3. **Voice Activity Detection:** Vectorized RMS energy calculation monitors speech. Recording automatically finalizes after ~800 ms of trailing silence.
-4. **Transcription:** Terminal displays `Przetwarzam...` while `whisper-cli.exe` performs fast local C++ speech inference and outputs `Usłyszałem: <twoja komenda>`.
-5. **Reasoning & Tool Execution:**
-   - If a system action is requested (e.g. *"otwórz notatnik"* or *"która godzina"*), Ollama triggers the appropriate registered tool function (`open_notepad` or `get_time`).
-   - If a conversational query, greeting, or joke is asked, the `zwykla_odpowiedz` tool or fallback LLM content supplies a natural Polish reply.
-6. **Voice Response:** JARVIS speaks the response using Piper in-memory streaming.
-7. **Fallback Retry:** If no speech was detected, JARVIS prompts for a retry (*"Nie dosłyszałem, powtórz proszę."*) and listens a second time before gracefully standing down.
+1. JARVIS will greet you: *"Witam szefie, co robimy?"*
+2. The console will display `Słucham...` indicating the microphone is active.
+3. Speak your command in Polish (e.g. *"która jest godzina"*, *"włącz kalkulator"*, *"znajdź przepis na sernik"*).
+4. When you stop speaking, JARVIS detects the pause, transcribes your speech, decides what to do, and replies out loud.
+
+### Stopping the Assistant
+
+You can stop the assistant anytime by:
+- Saying one of the exit phrases: *"wyłącz się"*, *"do widzenia"*, *"koniec"*, *"dobranoc"*, or *"nara"*.
+- Pressing `Ctrl + C` in the console window.
 
 ---
 
-## 🛠️ Adding New Tools
+## Available Tools
 
-Adding custom tools to JARVIS is modular and declarative using the `@tool` decorator in [tools.py](file:///c:/Users/filip/OneDrive/Desktop/projekty/jarvis/tools.py).
+JARVIS includes several built-in tools in `tools.py`:
 
-### Example 1: Simple Action (No Parameters)
+- **open_app**: Launches programs by name (e.g. notepad, calc, mspaint, explorer, steam).
+- **close_app**: Terminates a process using Windows taskkill.
+- **get_time**: Returns the current time formatted in Polish.
+- **get_date**: Returns today's date and day of the week in Polish.
+- **search_web**: Runs a Google search in your default web browser.
+- **open_website**: Opens a specific URL in your default browser.
+- **system_command**: Runs safe, read-only system diagnostic utilities (`systeminfo`, `ipconfig`, `hostname`, `whoami`, `tasklist`).
+- **zwykla_odpowiedz**: Handles general conversation, greetings, humor, and casual questions.
+
+---
+
+## Adding Custom Tools
+
+You can add new actions to `tools.py` using the `@tool` decorator from `registry.py`. The function is automatically converted into an Ollama-compatible schema on startup.
+
+### Simple Tool (No Parameters)
+
 ```python
 from registry import tool
 import subprocess
 
 @tool(
-    name="open_calculator",
-    description="Otwiera kalkulator systemowy. Użyj, gdy użytkownik prosi o włączenie lub otwarcie kalkulatora."
+    name="open_task_manager",
+    description="Otwiera Menedżer Zadań Windows. Użyj, gdy użytkownik prosi o menedżer zadań lub procesy."
 )
-def open_calculator() -> str:
-    """Launch the Windows Calculator application."""
-    subprocess.Popen(["calc.exe"])
-    return "Kalkulator został otwarty."
+def open_task_manager() -> str:
+    """Launch Windows Task Manager."""
+    subprocess.Popen(["taskmgr.exe"])
+    return "Menedżer zadań został otwarty."
 ```
 
-### Example 2: Parameterized Tool (With JSON Schema)
+### Parameterized Tool (With JSON Schema)
+
 ```python
 from registry import tool
+import webbrowser
 
 @tool(
-    name="zwykla_odpowiedz",
-    description="Użyj tego narzędzia ZAWSZE, gdy użytkownik prowadzi zwykłą rozmowę (np. wita się, pyta co u ciebie, żartuje).",
+    name="play_youtube_search",
+    description="Wyszukuje film na YouTube i otwiera wyniki w przeglądarce.",
     parameters={
         "type": "object",
         "properties": {
-            "tekst_dla_uzytkownika": {
+            "query": {
                 "type": "string",
-                "description": "Treść twojej odpowiedzi w języku polskim."
+                "description": "Czego użytkownik szuka na YouTube."
             }
         },
-        "required": ["tekst_dla_uzytkownika"]
+        "required": ["query"]
     }
 )
-def zwykla_odpowiedz(tekst_dla_uzytkownika: str) -> str:
-    """Return conversational response text for ordinary chat interactions."""
-    return tekst_dla_uzytkownika
+def play_youtube_search(query: str) -> str:
+    """Search YouTube and open results in the browser."""
+    webbrowser.open(f"https://www.youtube.com/results?search_query={query}")
+    return f"Szukam {query} na YouTube."
 ```
-
-Any function decorated with `@tool` in `tools.py` is dynamically converted into the OpenAI/Ollama function calling schema on startup and executed with its extracted arguments automatically.
 
 ---
 
-## 🗺️ Roadmap
+## Configuration
 
-- [x] Continuous audio streaming and vectorized RMS calculation in NumPy (`audio.py`)
-- [x] Energy-based Voice Activity Detection (VAD) to auto-stop recording
-- [x] High-performance `whisper-cli.exe` C++ transcription via `subprocess` (`transcriber.py`)
-- [x] In-memory zero-disk-I/O neural speech synthesis with Piper raw PCM streaming (`tts.py`)
-- [x] Modular architecture refactoring (`audio.py`, `transcriber.py`, `tts.py`, `registry.py`, `tools.py`, `actions.py`, `main.py`)
-- [x] Strict PEP 484 type annotations and Google-style docstrings across all modules
-- [x] Conversational retry and fallback logic for missing speech input
-- [x] Local LLM integration with Llama 3.1 via Ollama (`actions.py`)
-- [x] Extensible tool registry with JSON Schema and argument forwarding (`registry.py`)
-- [x] Built-in OS and conversational tools (`open_notepad`, `get_time`, `zwykla_odpowiedz`)
-- [ ] Background wake word detection (*Keyword: "Jarvis"*) via lightweight ONNX runtime
-- [ ] Expanded OS integrations (system volume control, default browser search, media keys)
-- [ ] Multi-turn conversational memory and context retention
+All runtime settings are located in `config.py`. You can adjust:
+
+- **Microphone and VAD**: `VAD_THRESHOLD` (energy threshold for speech), `SILENCE_LIMIT_FRAMES` (silence duration before stopping), `MAX_INITIAL_SILENCE_FRAMES` (timeout if no speech is heard).
+- **Speech Recognition**: `WHISPER_LANGUAGE`, `WHISPER_THREADS`.
+- **Speech Synthesis**: `TTS_VOLUME` (default volume scale 0.0 to 1.0), `TTS_LENGTH_SCALE` (speaking rate), `TTS_MODEL_PATH` (change voice models).
+- **LLM Settings**: `LLM_MODEL` (e.g. `llama3.1`), `LLM_SYSTEM_PROMPT` (persona and response style), `MAX_HISTORY_MESSAGES` (number of conversational turns to remember).

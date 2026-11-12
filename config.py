@@ -1,8 +1,8 @@
 """Centralized configuration for JARVIS Voice Assistant.
 
-All tunable parameters, file paths, and engine settings are defined here
-to avoid hardcoding values across individual modules. Import from this
-module instead of defining local constants.
+Defines all tunable parameters, file paths, and runtime settings for audio
+capture, speech recognition (whisper.cpp), speech synthesis (Piper TTS),
+and language model orchestration (Ollama).
 """
 
 from pathlib import Path
