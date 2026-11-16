@@ -1,11 +1,15 @@
 """Main entry point and orchestration pipeline for JARVIS Voice Assistant.
 
-This script coordinates audio capture (via `audio.py`), local offline speech
-recognition (via `transcriber.py`), local LLM intent interpretation and tool
-execution (via `actions.py`), and neural speech synthesis response (via `tts.py`).
-It implements a continuous conversational interaction loop with voice activity
-detection, automatic retry on missed speech, and graceful shutdown via voice
-command.
+This script coordinates passive wake word detection (via `wakeword.py`), audio
+capture (via `audio.py`), local offline speech recognition (via `transcriber.py`),
+local LLM intent interpretation and tool execution (via `actions.py`), and neural
+speech synthesis response (via `tts.py`).
+
+It implements a two-tier voice interaction architecture:
+1. Standby mode: Passively monitors the microphone for the keyword ("Hey Jarvis")
+   with minimal processing overhead.
+2. Active conversation session: Once awakened, conducts multi-turn voice dialogues,
+   executing tools and speaking responses until silence or an explicit shutdown command.
 """
 
 from audio import record_command, save_wav
@@ -21,19 +25,21 @@ SHUTDOWN_KEYWORDS: list[str] = [
 
 
 def main() -> None:
-    """Execute the continuous voice interaction loop.
+    """Execute the two-tier voice interaction orchestration loop.
 
     Workflow:
-    1. Plays an initial greeting indicating readiness ("Witam szefie, co robimy?").
-    2. Enters a continuous loop that:
-       a. Listens for user voice input via the microphone and records the command.
-       b. Saves captured audio to a temporary WAV file.
-       c. Transcribes the audio locally using whisper.cpp.
-       d. If transcription matches a shutdown keyword, says goodbye and exits.
-       e. If transcription is successful, passes the text to the local LLM
-          to run system tools or generate conversational responses, then speaks.
-       f. If no speech is recognized, prompts the user to repeat and continues.
-    3. Handles Ctrl+C for manual exit and recovers from errors gracefully.
+    1. Plays an initial system readiness greeting ("System aktywny - czekam na wezwanie").
+    2. Outer Standby Loop:
+       - Blocks on `wait_for_wakeword()` until "Hey Jarvis" is spotted.
+       - Vocalizes an acknowledgement ("Słucham, szefie?") upon wake detection.
+    3. Inner Conversation Session Loop:
+       - Captures speech with energy-based Voice Activity Detection (`record_command()`).
+       - If no speech is detected (silence timeout), prompts user or breaks back to standby.
+       - Transcribes audio locally using whisper.cpp (`transcribe()`).
+       - Checks for voice shutdown keywords (e.g. "do widzenia", "wyłącz się") to terminate.
+       - Interprets user intent with local LLM (Ollama) and dispatches tools (`execute_command()`).
+       - Synthesizes and vocalizes the assistant response via Piper TTS (`speak()`).
+    4. Handles keyboard interrupts (Ctrl+C) and connection failures with graceful spoken fallbacks.
     """
     try:
         speak("System aktywny - czekam na wezwanie")
@@ -47,30 +53,32 @@ def main() -> None:
             wait_for_wakeword()
 
             speak("Słucham, szefie?")
-            print("\nSłucham...")
             
-            audio, has_spoken = record_command()
-            if not has_spoken:
-                speak("Nie dosłyszałem, powtórz proszę.")
-                continue
-            
-            save_wav(audio)
+            while True:
+                print("\nSłucham...")
+                
+                audio, has_spoken = record_command()
+                if not has_spoken:
+                    speak("Nie dosłyszałem, powtórz proszę.")
+                    continue
+                
+                save_wav(audio)
 
-            print("Przetwarzam...")
-            text = transcribe()
+                print("Przetwarzam...")
+                text = transcribe()
 
-            if not text:
-                speak("Nie dosłyszałem, powtórz proszę.")
-                continue
+                if not text:
+                    speak("Żegnam")
+                    break
 
-            print(f"Usłyszałem: {text}")
+                print(f"Usłyszałem: {text}")
 
-            if any(keyword in text for keyword in SHUTDOWN_KEYWORDS):
-                speak("Do usłyszenia, szefie.")
-                break
+                if any(keyword in text for keyword in SHUTDOWN_KEYWORDS):
+                    speak("Do usłyszenia, szefie.")
+                    break
 
-            response = execute_command(text)
-            speak(response)
+                response = execute_command(text)
+                speak(response)
 
         except KeyboardInterrupt:
             print("\n[INFO] Przerwanie ręczne (Ctrl+C)")

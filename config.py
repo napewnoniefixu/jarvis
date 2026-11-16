@@ -2,7 +2,7 @@
 
 Defines all tunable parameters, file paths, and runtime settings for audio
 capture, speech recognition (whisper.cpp), speech synthesis (Piper TTS),
-and language model orchestration (Ollama).
+language model orchestration (Ollama), and wake word detection (openWakeWord).
 """
 
 from pathlib import Path
@@ -37,4 +37,12 @@ LLM_SYSTEM_PROMPT: str = (
 LLM_FALLBACK_RESPONSE: str = "Wybacz, nie wiem co powiedzieć."
 MAX_HISTORY_MESSAGES: int = 20
 
+# --- Temp Files ---
 TEMP_COMMAND_WAV: Path = BASE_DIR / "temp_command.wav"
+
+# --- Wake Word Detection (openWakeWord) ---
+WAKEWORD_MODEL: str = "hey_jarvis_v0.1"
+WAKEWORD_THRESHOLD: float = 0.7
+WAKEWORD_CHUNK_SIZE: int = 1280
+WAKEWORD_SAMPLE_RATE: int = 16000
+WAKEWORD_DTYPE: str = 'int16'
