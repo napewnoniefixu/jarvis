@@ -95,6 +95,6 @@ def save_wav(audio_data: np.ndarray, filename: Union[str, Path] = TEMP_COMMAND_W
 
     with wave.open(str(filename), 'w') as wav_file:
         wav_file.setnchannels(CHANNELS)
-        wav_file.setsampwidth(2)  # 2 bytes per sample = 16-bit PCM
+        wav_file.setsampwidth(2)
         wav_file.setframerate(SAMPLE_RATE)
         wav_file.writeframes(audio_data_int16.tobytes())

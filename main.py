@@ -12,6 +12,7 @@ from audio import record_command, save_wav
 from transcriber import transcribe
 from tts import speak
 from actions import execute_command
+from wakeword import wait_for_wakeword
 
 SHUTDOWN_KEYWORDS: list[str] = [
     "wyłącz się", "do widzenia", "koniec", "zamknij się",
@@ -35,7 +36,7 @@ def main() -> None:
     3. Handles Ctrl+C for manual exit and recovers from errors gracefully.
     """
     try:
-        speak("Witam szefie, co robimy?")
+        speak("System aktywny - czekam na wezwanie")
     except Exception as e:
         print(f"[FATAL] TTS initialization failed — cannot continue: {e}")
         return
@@ -43,6 +44,11 @@ def main() -> None:
     while True:
         try:
             print("\nSłucham...")
+            wait_for_wakeword()
+
+            speak("Słucham, szefie?")
+            print("\nSłucham...")
+            
             audio, has_spoken = record_command()
             if not has_spoken:
                 speak("Nie dosłyszałem, powtórz proszę.")
