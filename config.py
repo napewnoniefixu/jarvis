@@ -41,7 +41,7 @@ MAX_HISTORY_MESSAGES: int = 20
 TEMP_COMMAND_WAV: Path = BASE_DIR / "temp_command.wav"
 
 # --- Wake Word Detection (openWakeWord) ---
-WAKEWORD_MODEL: str = "hey_jarvis_v0.1"
+WAKEWORD_MODEL: str = "jarvis_v2.tflite"
 WAKEWORD_THRESHOLD: float = 0.7
 WAKEWORD_CHUNK_SIZE: int = 1280
 WAKEWORD_SAMPLE_RATE: int = 16000

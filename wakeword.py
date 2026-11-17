@@ -20,8 +20,6 @@ from config import (
     WAKEWORD_THRESHOLD,
 )
 
-# Global openWakeWord model instance initialized at module load time to prevent
-# redundant model re-instantiation overhead on subsequent wake cycles.
 model = Model(wakeword_models=[WAKEWORD_MODEL])
 
 
