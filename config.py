@@ -37,10 +37,8 @@ LLM_SYSTEM_PROMPT: str = (
 LLM_FALLBACK_RESPONSE: str = "Wybacz, nie wiem co powiedzieć."
 MAX_HISTORY_MESSAGES: int = 20
 
-# --- Temp Files ---
 TEMP_COMMAND_WAV: Path = BASE_DIR / "temp_command.wav"
 
-# --- Wake Word Detection (openWakeWord) ---
 WAKEWORD_MODEL: str = "jarvis_v2.tflite"
 WAKEWORD_THRESHOLD: float = 0.7
 WAKEWORD_CHUNK_SIZE: int = 1280
