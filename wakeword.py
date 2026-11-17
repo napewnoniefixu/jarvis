@@ -3,15 +3,17 @@
 This module provides continuous, low-latency offline keyword spotting to wake
 the assistant from standby mode. It captures live microphone audio in 16-bit PCM
 chunks using `sounddevice`, streams flattened samples into an openWakeWord
-model (such as 'jarvis_v2.tflite'), and blocks execution until the detection
+model (such as 'jarvis_v2.onnx'), and blocks execution until the detection
 confidence exceeds the configured threshold.
 """
 
+from pathlib import Path
 import numpy as np
 import sounddevice as sd
 from openwakeword.model import Model
 
 from config import (
+    BASE_DIR,
     CHANNELS,
     WAKEWORD_DTYPE,
     WAKEWORD_MODEL,
@@ -20,7 +22,20 @@ from config import (
     WAKEWORD_THRESHOLD,
 )
 
-model = Model(wakeword_models=[WAKEWORD_MODEL])
+# Resolve model target: check direct path, inside models/, or as a built-in model name
+_model_target = WAKEWORD_MODEL
+_candidate = Path(WAKEWORD_MODEL)
+
+if _candidate.is_file():
+    _model_target = str(_candidate)
+elif (BASE_DIR / "models" / WAKEWORD_MODEL).is_file():
+    _model_target = str(BASE_DIR / "models" / WAKEWORD_MODEL)
+elif (BASE_DIR / "models" / f"{WAKEWORD_MODEL}.onnx").is_file():
+    _model_target = str(BASE_DIR / "models" / f"{WAKEWORD_MODEL}.onnx")
+
+model = Model(wakeword_models=[_model_target])
+# Dynamically extract the prediction dictionary key assigned by openWakeWord (e.g. 'jarvis_v2')
+_model_key = list(model.models.keys())[0]
 
 
 def wait_for_wakeword() -> None:
@@ -49,7 +64,7 @@ def wait_for_wakeword() -> None:
         while True:
             data, _ = stream.read(WAKEWORD_CHUNK_SIZE)
             prediction = model.predict(data[:, 0])
-            score = prediction[WAKEWORD_MODEL]
+            score = prediction[_model_key]
             if score > WAKEWORD_THRESHOLD:
                 print("Wakeword detected!")
                 return

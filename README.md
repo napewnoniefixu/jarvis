@@ -25,7 +25,7 @@ JARVIS operates as a two-tier state machine to balance responsiveness with minim
 
 ### 1. Standby State (Passive Listening)
 - The assistant initializes in a passive listening mode managed by `wakeword.py`.
-- Audio is read in small 80 ms chunks (1280 samples at 16 kHz, 16-bit PCM) via `sounddevice` and evaluated against an openWakeWord model (`jarvis_v2.tflite`).
+- Audio is read in small 80 ms chunks (1280 samples at 16 kHz, 16-bit PCM) via `sounddevice` and evaluated against an openWakeWord model (`jarvis_v2.onnx`).
 - While in standby, CPU overhead remains minimal. Execution blocks until detection confidence exceeds `WAKEWORD_THRESHOLD` (default: `0.7`).
 
 ### 2. Active Session State (Interactive Dialogue)
@@ -54,7 +54,7 @@ jarvis/
 ├── main.py           Application entry point and two-tier orchestration loop
 ├── requirements.txt  Python dependencies
 ├── models/           Local model weights (git-ignored)
-│   ├── jarvis_v2.tflite           Wake word model
+│   ├── jarvis_v2.onnx             Wake word model
 │   ├── ggml-base.bin              Whisper ASR model
 │   ├── pl_PL-bass-high.onnx       Piper TTS voice model
 │   └── pl_PL-bass-high.onnx.json  Piper voice configuration
@@ -125,7 +125,7 @@ Create the `models/` folder and download the required models:
 if (!(Test-Path -Path "models")) { New-Item -ItemType Directory -Path "models" }
 
 # 1. Wake Word model (jarvis_v2 from fwartner/home-assistant-wakewords-collection)
-curl.exe -L "https://raw.githubusercontent.com/fwartner/home-assistant-wakewords-collection/main/en/jarvis_v2.tflite" -o "models/jarvis_v2.tflite"
+curl.exe -L "https://raw.githubusercontent.com/fwartner/home-assistant-wakewords-collection/main/en/jarvis/jarvis_v2.onnx" -o "models/jarvis_v2.onnx"
 
 # 2. Whisper ASR model (GGML base, ~140 MB)
 curl.exe -L "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin" -o "models/ggml-base.bin"
@@ -222,7 +222,7 @@ Functions decorated with `@tool` are dynamically exposed as JSON Schemas to Olla
 All runtime constants are centralized in `config.py`:
 
 - **Wake Word (`openWakeWord`)**:
-  - `WAKEWORD_MODEL`: Name or path of the target model (`jarvis_v2.tflite`).
+  - `WAKEWORD_MODEL`: Name or path of the target model (`jarvis_v2.onnx`).
   - `WAKEWORD_THRESHOLD`: Detection confidence cutoff (`0.7`).
   - `WAKEWORD_CHUNK_SIZE`: Number of audio frames per prediction step (`1280` samples = 80 ms).
   - `WAKEWORD_SAMPLE_RATE`: Required input sample rate (`16000` Hz).
@@ -254,7 +254,7 @@ All runtime constants are centralized in `config.py`:
 
 JARVIS builds upon the following open-source projects, models, and collections:
 
-- **Wake Word Model (`jarvis_v2.tflite`)**: [fwartner/home-assistant-wakewords-collection](https://github.com/fwartner/home-assistant-wakewords-collection) — Community wake word models for Home Assistant and openWakeWord.
+- **Wake Word Model (`jarvis_v2.onnx`)**: [fwartner/home-assistant-wakewords-collection](https://github.com/fwartner/home-assistant-wakewords-collection) — Community wake word models for Home Assistant and openWakeWord.
 - **Wake Word Detection Engine**: [dscripka/openWakeWord](https://github.com/dscripka/openWakeWord) — Lightweight, offline wake word and keyword spotting engine.
 - **Speech Recognition Engine**: [ggerganov/whisper.cpp](https://github.com/ggerganov/whisper.cpp) — High-performance C/C++ port of OpenAI's Whisper model.
 - **Whisper GGML Model Weights**: [ggerganov/whisper.cpp on Hugging Face](https://huggingface.co/ggerganov/whisper.cpp) — Pre-quantized models for `whisper.cpp` (`ggml-base.bin`).
