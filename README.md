@@ -193,7 +193,7 @@ Tools are defined in `tools.py` and registered via the `@tool` decorator:
 | `search_web` | `query: str` | Opens a Google search in the system default web browser. |
 | `open_website` | `url: str` | Opens a given web URL in the default browser (automatically adds `https://` if omitted). |
 | `system_command` | `command: str` | Executes safe, read-only diagnostic utilities (`systeminfo`, `ipconfig`, `hostname`, `whoami`, `tasklist`). Output is truncated to 500 characters. |
-| `zwykla_odpowiedz` | `tekst_dla_uzytkownika: str` | Handles casual conversation, greetings, humor, and general questions. |
+| `normal_response` | `text_for_user: str` | Handles casual conversation, greetings, humor, and general questions. |
 
 ### Adding Custom Tools
 
