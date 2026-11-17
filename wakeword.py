@@ -2,9 +2,9 @@
 
 This module provides continuous, low-latency offline keyword spotting to wake
 the assistant from standby mode. It captures live microphone audio in 16-bit PCM
-chunks using `sounddevice`, streams flattened samples into an ONNX-backed
-openWakeWord model (e.g. 'hey_jarvis_v0.1'), and blocks execution until the
-detection confidence exceeds the configured threshold.
+chunks using `sounddevice`, streams flattened samples into an openWakeWord
+model (such as 'jarvis_v2.tflite'), and blocks execution until the detection
+confidence exceeds the configured threshold.
 """
 
 import numpy as np
